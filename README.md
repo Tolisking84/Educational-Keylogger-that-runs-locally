@@ -1,6 +1,6 @@
 # Educational Keylogger that runs *locally*
 
-## A lightweight Windows keylogger wrotten in Python. Designed to capture every keystroke!
+A lightweight Windows keylogger wrotten in Python. Designed to capture every keystroke!
 
 # Legal and Ethical Disclaimer
 
