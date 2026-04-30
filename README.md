@@ -13,13 +13,13 @@ A Windows keyboard input analyzer designed to demonstrate how the operating syst
 
 ##Features
 - Global keystroke capture with automatic application window tracking
-- Accurate Unicode character resolution using native Windows APIs
+- Unicode characters using native Windows APIs
 - Proper handling of Shift, Caps Lock, and Ctrl modifier combinations
-- Clean, human-readable mapping for function keys, navigation keys, and system keys
+- Clean mapping for function keys, navigation keys, and system keys
 - Real-time console output with persistent UTF-8 file logging
-- Automatic log segmentation using visual separators when focus changes
-- Graceful termination via the ESC key
-- Cross-layout compatibility (AZERTY, QWERTY, Greek, Cyrillic, etc.)
+- Automatic log segmentation using visual separators when window focus changes
+- Termintaion of program using the ESC key
+- Cross-layout compatibility (AZERTY, QWERTY etc.)
 
 ## Technical Architecture
 
@@ -63,11 +63,11 @@ Example log structure:
 
 - Defensive Context: This pipeline mirrors how legitimate accessibility tools, password managers, and input method editors process keyboard input. Understanding it helps security professionals differentiate between documented API usage and malicious hooking techniques in forensic analysis.
 
-- Detection Surface: The script uses documented, query-based user32 functions. It does not install global hooks, inject code, or modify system state, making it suitable for studying input behavior without triggering malware heuristics.
+- Detection Surface: The script uses documented, query-based user32 functions. It does not install global hooks, inject code, modify system state, making it suitable for studying input behavior without triggering malware heuristics.
 
-- Hardware Limitations: The Fn key is processed at the keyboard controller level and never generates a scan code or virtual key event at the OS level. It cannot be captured by any standard Windows API.
+- Hardware Limitations: The Fn key is processed at the keyboard controller level and never generates a scan code or virtual key event at the OS level, therefore cannot be captured by any standard Windows API.
 
-- Dead Key Behavior: ToUnicodeEx consumes the dead-key buffer on the first press (e.g., pressing an accent key logs nothing until a base character follows). This matches standard Windows IME behavior.
+- Dead Key Behavior: ToUnicodeEx consumes the dead key buffer on the first press (e.g. pressing an accent key logs nothing until a base character follows).
 
 - Log Management: The log file grows continuously during execution. Clear or rotate input_log.txt manually if storage becomes a concern.
 
