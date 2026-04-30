@@ -11,7 +11,7 @@ Using a keylogger on a device without explicit, documented consent from the owne
 ## Overview
 A Windows keyboard input analyzer designed to demonstrate how the operating system translates physical keystrokes into usable Unicode characters. The script captures global input and every keyboard layouts, with proper handling and automtic organization by activelly stating each window/application used.
 
-##Features
+## Features
 - Global keystroke capture with automatic application window tracking
 - Unicode characters using native Windows APIs
 - Proper handling of Shift, Caps Lock, and Ctrl modifier combinations
