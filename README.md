@@ -45,7 +45,7 @@ Logs are automatically segmented by active window. Each section is separated by 
 Example log structure:
 ```
 ====== Untitled - Notepad ======
-[14:32:01] [ESC]
+[14:32:01] [ALT_L]
 [14:32:03] [F1]
 [14:32:05] a
 [14:32:06] [TAB]
